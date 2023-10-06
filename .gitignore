@@ -139,7 +139,7 @@ venv.bak/
 /site
 
 # data directory
-/data
+data/
 
 # auth
 auth.json

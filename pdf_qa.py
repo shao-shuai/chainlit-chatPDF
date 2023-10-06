@@ -1,5 +1,4 @@
 # Import necessary modules and define env variables
-
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -36,16 +35,15 @@ def auth_callback(username: str, password: str) -> Optional[cl.AppUser]:
         else:
             return None
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
 OPENAI_API_KEY= os.getenv("OPENAI_API_KEY")
 
 
 # text_splitter and system template
-
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 
+# system prompto to feed LLM
 system_template = """Use the following pieces of context to answer the users question.
 Please answer the question using the language of question.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -72,9 +70,11 @@ prompt = ChatPromptTemplate.from_messages(messages)
 chain_type_kwargs = {"prompt": prompt}
 
 def store_uploaded_file(file: AskFileResponse):
+    """Store an uploaded file to a specified location"""
     file_path = f"./data/{file.name}"
     open(file_path, "wb").write(file.content)
     return file_path
+
 # RAG settings
 @cl.on_chat_start
 async def on_chat_start():
@@ -126,7 +126,6 @@ async def on_chat_start():
 
 @cl.on_settings_update
 async def setup_agent(settings):
-    print("on_settings_update", settings)
 
     files = None
     # Wait for the user to upload a PDF file
@@ -141,21 +140,16 @@ async def setup_agent(settings):
     # to-do handle cases when multiple files are uploaded
     file = files[0]
 
-    # print(f"file upload successful!")
-
     # store file
     file_path = store_uploaded_file(file)
 
-    # Load pdf
+    # Load pdf, the logic is first store file, then load file with PyMuPDFLoader
     docs = PyMuPDFLoader(file_path).load()
 
-    # If the pdf is not OCRed yet, we need to OCR it with 'ocrmypdf'
+    # If the pdf is not OCRed, send a warning
     if docs[0].page_content == "":
-        print("Empty page~~~~~~~~~~~~~~~~~~")
-
-
-    print(f"this is {docs[0]}")
-
+        msg = cl.Message(content=f"Warning: The uploaded PDF has not been OCR'ed. Text extraction may not be accurate.")
+        await msg.send()
 
     msg = cl.Message(content=f"Processing `{file.name}`...")
     await msg.send()
@@ -187,7 +181,6 @@ async def setup_agent(settings):
         retriever=docsearch.as_retriever(),
     )
     
-
     # Save the metadata and texts in the user session
     cl.user_session.set("metadatas", metadatas)
     cl.user_session.set("texts", texts)
